@@ -1,0 +1,16 @@
+{
+  "players": [
+    "random",
+    "probbot",
+    "probbot:0.3"
+  ],
+  "games": 2,
+  "seed": 1,
+  "dice": 3,
+  "retries": 2,
+  "penalty": "forced_move",
+  "rotate": true,
+  "out": "examples",
+  "quiet": true,
+  "no_warmup": false
+}

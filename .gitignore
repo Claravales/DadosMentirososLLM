@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Entornos virtuales y secretos
+.venv/
+venv/
+.env
+
+# Resultados de ejecuciones (pesados y regenerables). El ejemplo pequeño vive en examples/
+logs/
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
