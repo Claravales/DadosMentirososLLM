@@ -38,9 +38,31 @@ Esta vez NO respondas sólo con el JSON: antes piensa en voz alta, de forma brev
 3) Decide si la apuesta actual es creíble o exagerada, y si te conviene dudar o subir.
 Termina SIEMPRE con la jugada final como un objeto JSON en la ÚLTIMA línea, y no escribas nada después."""
 
+# Estilo agresivo: debería farolear más y dudar menos.
+STYLE_AGRESIVO = """ESTILO: jugador agresivo.
+Eres un jugador atrevido que juega a presionar. Farolea con frecuencia: apuesta caras que NO tienes
+para que los demás crean que las tienes. Sube la apuesta con decisión, sin miedo, y evita dudar salvo
+que la apuesta anterior sea claramente imposible. Tu objetivo es que los demás se equivoquen por miedo."""
+
+# Estilo conservador: debería farolear poco y dudar más.
+STYLE_CONSERVADOR = """ESTILO: jugador conservador.
+Eres un jugador prudente que juega sólo con seguridad. Apuesta únicamente por caras de las que tengas
+dados en tu mano o que sean muy probables. No farolees. Si la apuesta anterior te parece exagerada
+para el número de dados que hay en la mesa, DUDA sin miedo."""
+
+# Estilo probabilista: pide decidir con cuentas, sin dar un paso a paso largo.
+STYLE_PROBABILISTA = """ESTILO: jugador que decide con probabilidades.
+Cada dado que no ves tiene 1/6 de probabilidad de mostrar una cara concreta. Si hay N dados que no ves,
+lo normal es que haya unos N/6 de cada cara entre ellos. Suma los dados tuyos de esa cara a ese número esperado
+y compáralo con la apuesta. Si la apuesta pide bastante más de lo esperado, duda. Si no, haz la subida más segura."""
+
 STYLES = {
     "basic": "",
     "cot": STYLE_COT,
+    "agresivo": STYLE_AGRESIVO,
+    "conservador": STYLE_CONSERVADOR,
+    "probabilista": STYLE_PROBABILISTA
+
 }
 
 
