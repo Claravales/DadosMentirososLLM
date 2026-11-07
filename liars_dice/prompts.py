@@ -29,8 +29,18 @@ FORMAT = """Responde ÚNICAMENTE con un objeto JSON en una línea, con NÚMEROS 
 {"action": "dudo"}                             para dudar
 Los números del ejemplo son sólo ilustrativos: elige los tuyos según tu situación."""
 
+# Estilo con razonamiento paso a paso. Aquí se permite razonar antes de la jugada
+# (el parser se queda con la ÚLTIMA jugada válida del texto).
+STYLE_COT = """ESTILO: razona paso a paso.
+Esta vez NO respondas sólo con el JSON: antes piensa en voz alta, de forma breve (máximo 6 líneas):
+1) Cuenta cuántos dados tuyos tienen la cara que te interesa.
+2) Estima cuántos dados de esa cara puede haber entre los dados ajenos (cada dado ajeno tiene una probabilidad de 1/6 de ser esa cara).
+3) Decide si la apuesta actual es creíble o exagerada, y si te conviene dudar o subir.
+Termina SIEMPRE con la jugada final como un objeto JSON en la ÚLTIMA línea, y no escribas nada después."""
+
 STYLES = {
     "basic": "",
+    "cot": STYLE_COT,
 }
 
 
