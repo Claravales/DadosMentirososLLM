@@ -119,9 +119,39 @@ def main(argv: list[str] | None = None) -> int:
                 # utf-8 explícito (en Windows el defecto es cp1252 y rompe con ->, emojis...);
                 # flush por evento: si algo falla, el log parcial queda en disco.
                 with open(out / f"{gid}.jsonl", "w", encoding="utf-8", newline="\n") as flog:
+                    def show_event(ev: dict) -> None:
+                        if args.quiet:
+                            return
+                        event_type = ev.get("type")
+                        if event_type == "turn":
+                            print(f"\nRonda {ev['round']} | Turno {ev['turn']} | {ev['player']}")
+                            previous = ev.get("current_bid")
+                            if previous:
+                                print(f"  Apuesta actual: {previous['quantity']} dados de cara {previous['face']}")
+                            for attempt in ev.get("attempts", []):
+                                if attempt.get("error"):
+                                    print(f"  Respuesta inválida: {attempt['error']}")
+                            action = ev.get("action", {})
+                            if action.get("action") == "bid":
+                                print(f"  {ev['player']} apuesta: {action['quantity']} dados de cara {action['face']}")
+                            else:
+                                print(f"  {ev['player']} duda")
+                            if ev.get("forced"):
+                                print("  (jugada aplicada por el árbitro tras agotar reintentos)")
+                        elif event_type == "challenge":
+                            bid = ev["challenged_bid"]
+                            result = "cierta" if ev["bid_was_true"] else "falsa"
+                            print(f"  Resultado: había {ev['real_count']} dados de cara {bid['face']}; "
+                                  f"la apuesta era {result}. Pierde un dado {ev['loser']}.")
+                        elif event_type == "penalty":
+                            print(f"  Penalización: {ev['player']} pierde un dado ({ev['dice_left']} restantes).")
+                        elif event_type == "eliminated":
+                            print(f"  {ev['player']} queda eliminado.")
+
                     def sink(ev: dict, f=flog) -> None:
                         f.write(json.dumps(ev, ensure_ascii=False, default=str) + "\n")
                         f.flush()
+                        show_event(ev)
                     res = referee.play(players, seed=seed, game_id=gid, on_event=sink)
             except Exception:  # un fallo inesperado no tumba toda la ejecución
                 tb = traceback.format_exc()
@@ -161,3 +191,5 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
