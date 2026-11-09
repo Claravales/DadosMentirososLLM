@@ -13,45 +13,14 @@ Salida (carpeta --out/<run_id>/):
 from __future__ import annotations
 
 import argparse
-import csv
-import json
 import sys
 import time
-import traceback
-from collections import Counter
-from pathlib import Path
 
 from liars_dice.game import PENALTIES, Referee
 from liars_dice.players import make_player
-
-
-def _warmup(specs: list[str], out: Path) -> int:
-    """Calienta cada spec distinto UNA vez antes de la primera partida (carga el modelo en memoria).
-    Guarda los eventos en <out>/infrastructure.jsonl. Devuelve 0 si todo va bien, 2 si el servidor falla."""
-    with open(out / "infrastructure.jsonl", "w", encoding="utf-8", newline="\n") as f:
-        def log(spec: str, ev: dict) -> None:
-            f.write(json.dumps({"type": "infrastructure", "spec": spec, **ev}, ensure_ascii=False, default=str) + "\n")
-            f.flush()
-
-        for spec in dict.fromkeys(specs):
-            player = make_player(spec, "warmup")
-            try:
-                events = player.warmup()
-            except Exception as exc:  # InfrastructureError u otro fallo: no se juega con un servidor roto
-                events = list(getattr(exc, "events", []))
-                if not any(e.get("kind") == "warmup" for e in events):
-                    events.append({"kind": "warmup", "ok": False, "detail": f"{type(exc).__name__}: {exc}"})
-                for ev in events:
-                    log(spec, ev)
-                print(f"CALENTAMIENTO FALLIDO para {spec}: {exc}", file=sys.stderr)
-                return 2
-            for ev in events:
-                log(spec, ev)
-                if ev.get("kind") == "warmup" and ev.get("ok"):
-                    print(f"Modelo calentado: {spec} ({ev.get('seconds')} s)")
-                elif ev.get("kind") == "retry":
-                    print(f"  (reintento tras HTTP {ev.get('http_status')} durante el calentamiento)")
-    return 0
+from liars_dice.runner import WarmupError, check_specs, new_run_dir, run_series, warmup, write_run_config
+from liars_dice.ui import (ConsoleView, RunStats, Style, detect_color, detect_unicode, fmt_time,
+                           render_summary, setup_console)
 
 
 def _positive(name: str, minimum: int):
@@ -61,6 +30,13 @@ def _positive(name: str, minimum: int):
             raise argparse.ArgumentTypeError(f"{name} debe ser >= {minimum} (recibido {value})")
         return value
     return conv
+
+
+def _print_warmup_event(spec: str, ev: dict) -> None:
+    if ev.get("kind") == "warmup" and ev.get("ok"):
+        print(f"Modelo calentado: {spec} ({ev.get('seconds')} s)")
+    elif ev.get("kind") == "retry":
+        print(f"  (reintento tras HTTP {ev.get('http_status')} durante el calentamiento)")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -74,122 +50,68 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--rotate", action="store_true",
                     help="rota los asientos cada partida para anular la ventaja de salir primero")
     ap.add_argument("--out", default="logs")
-    ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--quiet", action="store_true", help="solo una línea de progreso por partida y el resumen")
+    ap.add_argument("--verbose", "-v", action="store_true",
+                    help="añade manos, probabilidades P(cierta) y latencias (modo espectador)")
+    ap.add_argument("--no-color", action="store_true", help="sin colores ANSI (también con NO_COLOR=1 o al redirigir)")
     ap.add_argument("--no-warmup", action="store_true",
                     help="no calentar los modelos antes de la primera partida")
     args = ap.parse_args(argv)
+    setup_console()
+    style = Style(detect_color(args.no_color), detect_unicode())
+    view = ConsoleView(style, level=0 if args.quiet else (2 if args.verbose else 1))
     if len(args.players) < 2:
         ap.error("--players necesita al menos 2 jugadores")
-    for spec in args.players:  # falla rápido ante un spec o una opción mal escrita, antes de gastar tiempo
-        try:
-            make_player(spec, "check")
-        except ValueError as exc:
-            ap.error(f"spec de jugador inválido {spec!r}: {exc}")
+    try:
+        check_specs(args.players, make_player)
+    except ValueError as exc:
+        ap.error(str(exc))
 
-    run_id = time.strftime("%Y%m%d-%H%M%S")
-    out = Path(args.out) / run_id
-    suffix = 1
-    while out.exists():  # dos ejecuciones en el mismo segundo no se pisan
-        suffix += 1
-        out = Path(args.out) / f"{run_id}-{suffix}"
-    out.mkdir(parents=True)
-    (out / "run_config.json").write_text(json.dumps(vars(args), indent=2, ensure_ascii=False), encoding="utf-8")
+    out = new_run_dir(args.out)
+    write_run_config(out, vars(args))
 
     if not args.no_warmup:
-        code = _warmup(args.players, out)
-        if code:
-            return code
+        try:
+            warmup(args.players, out, make_player, on_event=_print_warmup_event)
+        except WarmupError as exc:
+            print(f"CALENTAMIENTO FALLIDO para {exc.spec}: {exc.cause}", file=sys.stderr)
+            return 2
+
     referee = Referee(dice_per_player=args.dice, max_retries=args.retries, penalty=args.penalty)
-    n = len(args.players)
-    wins: Counter = Counter()
-    played: Counter = Counter()
-    exit_code = 0
+    run_stats = RunStats()
+    t0 = time.monotonic()
+    if not args.quiet:
+        print(style.box([style.c("DADOS MENTIROSOS", "bold", "white") + style.c("  ·  Liar's Dice", "grey"),
+                         style.c(f"{args.games} {'partida' if args.games == 1 else 'partidas'} · {args.dice} dados · penalización {args.penalty}"
+                                 + (" · rotando asientos" if args.rotate else ""), "grey")]))
 
-    with open(out / "games.csv", "w", newline="", encoding="utf-8") as fcsv:
-        w = csv.writer(fcsv)
-        w.writerow(["game_id", "seed", "winner_name", "winner_spec", "rounds", "seating", "status", "detail"])
-        for g in range(args.games):
-            shift = g % n if args.rotate else 0
-            specs = args.players[shift:] + args.players[:shift]
-            seed = args.seed + g
-            gid = f"game_{g + 1:04d}"
-            seating = "|".join(f"J{i + 1}={s}" for i, s in enumerate(specs))
-            try:
-                players = [make_player(s, f"J{i + 1}", seed=seed * 100 + i) for i, s in enumerate(specs)]
-                # utf-8 explícito (en Windows el defecto es cp1252 y rompe con ->, emojis...);
-                # flush por evento: si algo falla, el log parcial queda en disco.
-                with open(out / f"{gid}.jsonl", "w", encoding="utf-8", newline="\n") as flog:
-                    def show_event(ev: dict) -> None:
-                        if args.quiet:
-                            return
-                        event_type = ev.get("type")
-                        if event_type == "turn":
-                            print(f"\nRonda {ev['round']} | Turno {ev['turn']} | {ev['player']}")
-                            previous = ev.get("current_bid")
-                            if previous:
-                                print(f"  Apuesta actual: {previous['quantity']} dados de cara {previous['face']}")
-                            for attempt in ev.get("attempts", []):
-                                if attempt.get("error"):
-                                    print(f"  Respuesta inválida: {attempt['error']}")
-                            action = ev.get("action", {})
-                            if action.get("action") == "bid":
-                                print(f"  {ev['player']} apuesta: {action['quantity']} dados de cara {action['face']}")
-                            else:
-                                print(f"  {ev['player']} duda")
-                            if ev.get("forced"):
-                                print("  (jugada aplicada por el árbitro tras agotar reintentos)")
-                        elif event_type == "challenge":
-                            bid = ev["challenged_bid"]
-                            result = "cierta" if ev["bid_was_true"] else "falsa"
-                            print(f"  Resultado: había {ev['real_count']} dados de cara {bid['face']}; "
-                                  f"la apuesta era {result}. Pierde un dado {ev['loser']}.")
-                        elif event_type == "penalty":
-                            print(f"  Penalización: {ev['player']} pierde un dado ({ev['dice_left']} restantes).")
-                        elif event_type == "eliminated":
-                            print(f"  {ev['player']} queda eliminado.")
+    def on_game_start(g: int, gid: str, specs: list[str]) -> None:
+        eta = f"ETA {fmt_time((time.monotonic() - t0) / g * (args.games - g))}" if g else ""
+        view.game_header(g + 1, args.games, gid, specs, eta)
 
-                    def sink(ev: dict, f=flog) -> None:
-                        f.write(json.dumps(ev, ensure_ascii=False, default=str) + "\n")
-                        f.flush()
-                        show_event(ev)
-                    res = referee.play(players, seed=seed, game_id=gid, on_event=sink)
-            except Exception:  # un fallo inesperado no tumba toda la ejecución
-                tb = traceback.format_exc()
-                (out / f"{gid}.error.txt").write_text(tb, encoding="utf-8")
-                w.writerow([gid, seed, "", "", "", seating, "error", tb.strip().splitlines()[-1]])
-                fcsv.flush()
-                print(f"{gid}: ERROR inesperado (ver {gid}.error.txt)", file=sys.stderr)
-                exit_code = 1
-                continue
+    def on_game_end(g: int, gid: str, res) -> None:
+        spec_of = {p["name"]: p["spec"] for p in res.players}
+        run_stats.add_game(res.players, res.winner, res.rounds, res.stats)
+        elapsed = time.monotonic() - t0
+        remaining = elapsed / (g + 1) * (args.games - g - 1)
+        view.game_line(g + 1, args.games, gid, res.winner, spec_of.get(res.winner, ""), res.rounds, elapsed, remaining)
 
-            if res.aborted:
-                w.writerow([gid, seed, "", "", res.rounds, "|".join(f"{p['name']}={p['spec']}" for p in res.players),
-                            "aborted", res.aborted])
-                fcsv.flush()
-                print(f"{gid}: ABORTADA por fallo de infraestructura: {res.aborted}", file=sys.stderr)
-                print("Se detiene la ejecución: no tiene sentido seguir con el servidor del modelo roto.",
-                      file=sys.stderr)
-                exit_code = 2
-                break
+    def on_error(gid: str, _last_line: str) -> None:
+        print(f"{gid}: ERROR inesperado (ver {gid}.error.txt)", file=sys.stderr)
 
-            spec_of = {p["name"]: p["spec"] for p in res.players}
-            wspec = spec_of.get(res.winner, "")
-            w.writerow([gid, seed, res.winner, wspec, res.rounds,
-                        "|".join(f"{p['name']}={p['spec']}" for p in res.players), "ok", ""])
-            fcsv.flush()
-            for s in specs:
-                played[s] += 1
-            wins[wspec] += 1
-            if not args.quiet:
-                print(f"{gid}: gana {res.winner} ({wspec}) en {res.rounds} rondas")
+    result = run_series(specs=args.players, games=args.games, seed=args.seed, referee=referee, out=out,
+                        make_player=make_player, rotate=args.rotate, on_game_start=on_game_start,
+                        on_event=view.handle, on_game_end=on_game_end, on_error=on_error)
 
-    print(f"\nRegistros en {out}")
-    for s in dict.fromkeys(args.players):
-        print(f"  {s:30s} victorias {wins[s]:4d} / {played[s]:4d} asientos")
+    exit_code = 1 if result.errors else 0
+    if result.aborted:
+        print(f"{result.aborted_game}: ABORTADA por fallo de infraestructura: {result.aborted}", file=sys.stderr)
+        print("Se detiene la ejecución: no tiene sentido seguir con el servidor del modelo roto.", file=sys.stderr)
+        exit_code = 2
+    print(render_summary(style, run_stats, args.players, out, time.monotonic() - t0,
+                         result.errors, 1 if result.aborted else 0))
     return exit_code
 
 
 if __name__ == "__main__":
     sys.exit(main())
-
-

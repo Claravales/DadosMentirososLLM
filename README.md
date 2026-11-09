@@ -3,7 +3,19 @@
 Árbitro de Liar's Dice (Perudo) en el que todos los jugadores son modelos de lenguaje locales (pesos abiertos, vía Ollama).
 Sólo usa la librería estándar de Python (3.10+). Para los tests: `pip install -r requirements-dev.txt`.
 
-## Uso rápido
+## Aplicación con interfaz gráfica (sin terminal)
+
+Doble clic en **`Dados Mentirosos.pyw`** (necesita Python instalado) o en **`dist/Dados Mentirosos.exe`** (no necesita nada):
+se abre la interfaz en el navegador, se configura la partida y se ve jugar en una mesa animada. Se cierra sola al cerrar la
+pestaña, y guarda los registros en `logs/<fecha>/` (mismo formato que `run_games.py`). `build_exe.bat` regenera el `.exe`.
+Código: `web_app.py` (servidor local), `liars_dice/web/index.html` (interfaz) y `liars_dice/runner.py` (ejecución y registros, compartido con `run_games.py`).
+El «Modo rápido para modelos» (activo por defecto) añade `think=false`, `num_ctx=2048` y `keep_alive=30m` a los modelos de Ollama.
+
+**Windows y el `.exe`:** el `.exe` no está firmado digitalmente, así que *Smart App Control* o SmartScreen pueden bloquearlo («editor desconocido»).
+`Abrir Dados Mentirosos.bat` evita el problema usando Python (que sí está firmado) y solo recurre al `.exe` si no hay Python.
+Para repartir el `.exe` a otras personas sin avisos hace falta firmarlo con un certificado de firma de código.
+
+## Uso rápido (línea de comandos)
 
 ```bash
 python -m pytest -q                                   # tests (usad `python -m pytest`, no `pytest` a secas)
@@ -11,6 +23,10 @@ python run_games.py --players random probbot probbot:0.3 --games 20 --seed 1 --r
 # con Ollama en marcha (comillas: el spec lleva '?'):
 python run_games.py --players "ollama:gemma4:e2b?think=false" probbot --games 10 --rotate
 ```
+
+Salida de consola: colores y dados Unicode (se desactivan solos al redirigir, con `NO_COLOR=1` o `--no-color`);
+`--verbose` muestra manos y probabilidades, `--quiet` solo una línea de progreso (con ETA) por partida; al final, un resumen con ranking,
+% de victorias frente al azar y fallos de respuesta por jugador.
 
 Cada ejecución crea `logs/<fecha>/` con `game_XXXX.jsonl` (todos los eventos), `games.csv` y `run_config.json`.
 Un ejemplo ya generado (sin Ollama) está en [examples/sample_run/](examples/sample_run/).
@@ -35,6 +51,8 @@ Opciones de Ollama (separadas por `+`, o `&` si lo entrecomilláis; el `+` evita
 | `host` | URL | `http://localhost:11434` | |
 | `retry_wait` | float ≥ 0 | 2 | segundos de espera antes del reintento tras HTTP 500 |
 | `warmup_timeout` | float > 0 | 600 | segundos máx. para cargar el modelo en el calentamiento |
+| `num_ctx` | int > 0 | (el de Ollama) | ventana de contexto. **Con poca VRAM/RAM, `2048` evita que Ollama expulse el modelo tras cada respuesta** (recarga de ~40 s por turno) |
+| `keep_alive` | texto | 5m | cuánto tiempo mantiene Ollama el modelo en memoria, p. ej. `30m` |
 
 Ejemplo: `"ollama:gemma4:e2b@basic?think=false+temperature=0.2+num_predict=300"`.
 El **spec completo** es la identidad del jugador: dos specs distintos se cuentan como jugadores distintos en `games.csv` y en el resumen.

@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dados Mentirosos</title>
+<style>
+:root{
+  --bg:#09090d; --s1:#101117; --s2:#16181f; --s3:#1d2029; --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.12);
+  --text:#eceef5; --muted:#8a90a3; --faint:#5b6173;
+  --accent:#8b9bff; --accent-ink:#0b0d16; --good:#4ade9d; --bad:#ff6b81; --warn:#ffc857;
+  --p0:#5ad1e6; --p1:#c58bff; --p2:#ffc857; --p3:#4ade9d; --p4:#8b9bff; --p5:#ff8f7a;
+  --die:#f5f6fa; --pip:#14161e; --shadow:0 10px 30px -12px rgba(0,0,0,.6);
+  --r:14px;
+}
+@media (prefers-color-scheme: light){
+  :root{--bg:#f4f5f9; --s1:#ffffff; --s2:#f1f3f8; --s3:#e8ebf3; --line:rgba(15,20,40,.08); --line2:rgba(15,20,40,.14);
+    --text:#161a26; --muted:#667089; --faint:#9aa1b5; --accent:#4b5df0; --accent-ink:#fff; --good:#0f9f6e; --bad:#dc3550; --warn:#b97d00;
+    --p0:#0a9fbd; --p1:#8a47e0; --p2:#b97d00; --p3:#0f9f6e; --p4:#4b5df0; --p5:#dc5a3f; --die:#fff; --pip:#161a26;
+    --shadow:0 10px 30px -14px rgba(20,30,70,.25)}
+}
+*{box-sizing:border-box;margin:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);font:14.5px/1.5 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-feature-settings:"tnum","cv11";-webkit-font-smoothing:antialiased;min-height:100vh}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.app{max-width:1360px;margin:0 auto;padding:0 28px 40px}
+header{display:flex;align-items:center;justify-content:space-between;padding:22px 0 20px}
+.brand{display:flex;align-items:center;gap:12px;font-weight:650;letter-spacing:-.01em;font-size:16px}
+.brand .die{width:26px;height:26px;padding:4px;border-radius:7px}
+.brand small{color:var(--muted);font-weight:450;font-size:13px;margin-left:2px}
+.pill{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);padding:6px 12px;border:1px solid var(--line);border-radius:99px;background:var(--s1)}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.pill.live i{background:var(--good);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent)}80%,100%{box-shadow:0 0 0 8px transparent}}
+
+main{display:grid;grid-template-columns:304px minmax(0,1fr) 270px;gap:28px;align-items:start}
+@media (max-width:1180px){main{grid-template-columns:304px minmax(0,1fr)} .logcol{grid-column:1/-1}}
+@media (max-width:820px){main{grid-template-columns:1fr} .app{padding:0 16px 32px}}
+
+h2{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--faint);margin:0 0 12px}
+.sec{padding:0 0 22px;margin:0 0 22px;border-bottom:1px solid var(--line)}
+.sec:last-of-type{border:0;margin-bottom:0}
+
+/* jugadores */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 6px 6px 11px;border-radius:99px;background:var(--s2);border:1px solid var(--line);
+  font-size:13px;animation:in .25s ease;max-width:100%}
+.chip b{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{width:20px;height:20px;border-radius:50%;color:var(--muted);font-size:15px;line-height:1;display:grid;place-items:center}
+.chip button:hover{background:var(--s3);color:var(--text)}
+.add{padding:6px 13px;border-radius:99px;border:1px dashed var(--line2);color:var(--muted);font-size:13px;transition:.15s}
+.add:hover,.add[aria-expanded=true]{color:var(--text);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+@keyframes in{from{opacity:0;transform:scale(.9)}}
+.menu{margin-top:10px;background:var(--s1);border:1px solid var(--line2);border-radius:var(--r);padding:8px;box-shadow:var(--shadow);animation:in .18s ease}
+.menu h3{font-size:11px;color:var(--faint);font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:8px 8px 4px}
+.menu .opt{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:8px 10px;border-radius:9px;font-size:13.5px}
+.menu .opt:hover{background:var(--s2)}
+.menu .opt em{font-style:normal;color:var(--faint);font-size:12px}
+.menu .note{color:var(--faint);font-size:12.5px;padding:4px 10px 8px}
+.menu form{display:flex;gap:6px;padding:6px 4px 2px}
+input[type=text],input[type=number],select{width:100%;background:var(--s2);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px}
+.mini{padding:0 12px;border-radius:9px;background:var(--s3);font-size:13px;flex:none}
+.hint{color:var(--faint);font-size:12.5px;margin-top:10px}
+
+/* ajustes */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.step{background:var(--s2);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 12px}
+.step label{display:block;font-size:11.5px;color:var(--muted)}
+.step div{display:flex;align-items:center;justify-content:space-between;gap:2px}
+.step output{font-size:17px;font-weight:600;min-width:1.2em}
+.step button{width:24px;height:24px;border-radius:8px;color:var(--muted);font-size:16px}
+.step button:hover{background:var(--s3);color:var(--text)}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;cursor:pointer;font-size:13.5px}
+.switch small{display:block;color:var(--faint);font-size:12px;line-height:1.35}
+.switch input{appearance:none;width:36px;height:21px;border-radius:99px;background:var(--s3);position:relative;flex:none;cursor:pointer;transition:.2s;border:1px solid var(--line2)}
+.switch input::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--muted);transition:.2s}
+.switch input:checked{background:var(--accent);border-color:var(--accent)}
+.switch input:checked::after{left:17px;background:var(--accent-ink)}
+details summary{cursor:pointer;color:var(--muted);font-size:13px;padding:6px 0;list-style:none}
+details summary::before{content:"›";display:inline-block;margin-right:7px;transition:.2s}
+details[open] summary::before{transform:rotate(90deg)}
+details .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+details label{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
+
+.go{width:100%;padding:14px;border-radius:13px;background:var(--accent);color:var(--accent-ink);font-weight:650;font-size:15px;letter-spacing:.01em;
+  transition:transform .1s,filter .15s;display:flex;align-items:center;justify-content:center;gap:9px}
+.go:hover{filter:brightness(1.08)} .go:active{transform:scale(.985)}
+.go.stop{background:var(--s3);color:var(--text);border:1px solid var(--line2)}
+.go:disabled{opacity:.45;cursor:default}
+.err{color:var(--bad);font-size:13px;margin-top:12px;min-height:1px;white-space:pre-wrap}
+.link{color:var(--muted);font-size:13px;margin-top:14px;display:inline-block}
+.link:hover{color:var(--text)}
+
+/* escenario */
+.stage{background:var(--s1);border:1px solid var(--line);border-radius:20px;overflow:hidden;min-height:600px;display:flex;flex-direction:column}
+.bar{height:2px;background:var(--line)} .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .5s}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;flex-wrap:wrap}
+.shead .stat{color:var(--muted);font-size:13px}
+.ctrl{display:flex;align-items:center;gap:6px}
+.seg{display:flex;background:var(--s2);border-radius:10px;padding:2px;border:1px solid var(--line)}
+.seg button{padding:4px 10px;border-radius:8px;font-size:12.5px;color:var(--muted)}
+.seg button.on{background:var(--s3);color:var(--text)}
+.ib{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:var(--s2);color:var(--muted);display:grid;place-items:center;font-size:13px}
+.ib:hover{color:var(--text)} .ib.on{color:var(--accent);border-color:var(--accent)}
+.score{display:flex;gap:18px;padding:0 20px 14px;flex-wrap:wrap;min-height:6px}
+.score .s{font-size:12.5px;min-width:120px;flex:1;max-width:220px}
+.score .s div{display:flex;justify-content:space-between;gap:8px;color:var(--muted)}
+.score .s div b{color:var(--text);font-weight:600}
+.score .s div span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.score .s i{display:block;height:3px;border-radius:3px;background:var(--s3);margin-top:5px;overflow:hidden}
+.score .s i u{display:block;height:100%;background:var(--good);border-radius:3px;transition:width .5s}
+.seats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;padding:6px 20px 0}
+.seat{border-radius:16px;padding:14px;background:var(--s2);border:1px solid transparent;transition:all .3s;position:relative}
+.seat.active{background:color-mix(in srgb,var(--c) 11%,var(--s2));border-color:color-mix(in srgb,var(--c) 55%,transparent);transform:translateY(-2px)}
+.seat.out{opacity:.35;filter:grayscale(1)}
+.seat.winner{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--s2))}
+.seat .top{display:flex;align-items:center;gap:9px}
+.av{width:26px;height:26px;border-radius:50%;background:color-mix(in srgb,var(--c) 22%,transparent);color:var(--c);display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.seat .nm{min-width:0} .seat .nm b{font-size:13.5px;display:block;line-height:1.2}
+.seat .nm span{color:var(--faint);font-size:11.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hand{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;min-height:34px}
+.life{display:flex;gap:4px;margin-top:10px}
+.life i{width:14px;height:4px;border-radius:3px;background:var(--c)} .life i.lost{background:var(--s3)}
+.die{width:34px;height:34px;border-radius:9px;background:var(--die);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:5px;gap:1px;
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.13),0 3px 8px -2px rgba(0,0,0,.4);flex:none}
+.die i{border-radius:50%;margin:1px} .die i.on{background:var(--pip)}
+.die.hid{background:var(--s3);box-shadow:none;display:grid;place-items:center;color:var(--faint);font-weight:600}
+.die.hit{outline:2px solid var(--warn);outline-offset:1px;animation:pop .5s} .die.dim{opacity:.28}
+.die.mini{width:16px;height:16px;padding:2px;border-radius:4px;gap:0;display:inline-grid;vertical-align:middle;margin-top:-3px;box-shadow:inset 0 -1px 0 rgba(0,0,0,.15),0 1px 2px rgba(0,0,0,.35)}
+.die.mini i{margin:0}
+.die.big{width:68px;height:68px;padding:10px;border-radius:15px}
+.die.roll{animation:roll .6s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes roll{0%{transform:translateY(-14px) rotate(-130deg);opacity:0}100%{transform:none;opacity:1}}
+@keyframes pop{40%{transform:scale(1.22)}}
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:26px 20px 34px;min-height:210px}
+.center .who{color:var(--muted);font-size:13px}
+.bidline{display:flex;align-items:center;justify-content:center;gap:16px;margin:10px 0;font-size:56px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.bidline .x{color:var(--faint);font-size:28px;font-weight:400}
+.bidline.pop{animation:pop .4s}
+.dudo{font-size:44px;font-weight:800;letter-spacing:-.03em;color:var(--bad);animation:pop .5s}
+.verdict{font-weight:600;font-size:15px;margin-top:4px}
+.verdict.ok{color:var(--good)} .verdict.ko{color:var(--bad)}
+.empty{display:flex;flex-direction:column;align-items:center;gap:18px;color:var(--faint)}
+.empty .die{opacity:.9} .empty .row3{display:flex;gap:14px}
+.empty .row3 .die:nth-child(1){transform:rotate(-10deg)} .empty .row3 .die:nth-child(3){transform:rotate(9deg)}
+
+/* registro */
+.log{max-height:640px;overflow:auto;font-size:13px;padding-right:6px;scrollbar-width:thin}
+.log .rd{margin:14px 0 5px;color:var(--faint);font-size:11px;letter-spacing:.09em;text-transform:uppercase}
+.log .rd:first-child{margin-top:0}
+.log .ln{padding:3px 0 3px 12px;border-left:1px solid var(--line);color:var(--muted)}
+.log .ln b{font-weight:600}
+.log .fx{color:var(--bad)} .log .em{color:var(--text)}
+.faint{color:var(--faint);font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand"><span class="die"><i></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i></span>Dados Mentirosos<small>Liar's Dice · modelos locales</small></div>
+  <div class="pill" id="pill"><i></i><span id="pilltxt">Listo</span></div>
+</header>
+
+<main>
+  <aside>
+    <div class="sec">
+      <h2>Jugadores</h2>
+      <div class="chips" id="chips"></div>
+      <div id="menu" hidden></div>
+      <div class="hint" id="lineuphint"></div>
+    </div>
+
+    <div class="sec">
+      <h2>Partida</h2>
+      <div class="grid3" id="steppers"></div>
+      <label class="switch"><span>Rotar asientos<small>Compensa la ventaja de salir primero</small></span><input type="checkbox" id="rotate" checked></label>
+      <label class="switch"><span>Modo rápido para modelos<small>Sin razonamiento y con memoria acotada: evita recargas lentas</small></span><input type="checkbox" id="fast" checked></label>
+      <details>
+        <summary>Avanzado</summary>
+        <div class="row">
+          <div><label for="retries">Reintentos</label><input id="retries" type="number" min="0" max="10" value="2"></div>
+          <div><label for="penalty">Penalización</label><select id="penalty"><option value="forced_move">jugada forzada</option><option value="lose_die">pierde un dado</option></select></div>
+        </div>
+      </details>
+    </div>
+
+    <button class="go" id="go"><span id="goicon">▶</span><span id="gotxt">Jugar</span></button>
+    <div class="err" id="err" role="alert"></div>
+    <button class="link" id="openlogs">Abrir carpeta de registros</button>
+  </aside>
+
+  <section class="stage" aria-live="polite">
+    <div class="bar"><i id="prog"></i></div>
+    <div class="shead">
+      <span class="stat" id="stat">Elige jugadores y pulsa Jugar.</span>
+      <div class="ctrl">
+        <div class="seg" id="speed" role="group" aria-label="Velocidad">
+          <button data-v="1">1×</button><button data-v="2" class="on">2×</button><button data-v="4">4×</button><button data-v="99" title="Sin animación">⏭</button>
+        </div>
+        <button class="ib" id="pause" title="Pausa" aria-label="Pausa">❚❚</button>
+        <button class="ib on" id="eye" title="Ver los dados de todos" aria-label="Ver dados">◉</button>
+      </div>
+    </div>
+    <div class="score" id="score"></div>
+    <div class="seats" id="seats"></div>
+    <div class="center" id="center"></div>
+  </section>
+
+  <aside class="logcol">
+    <h2>Registro</h2>
+    <div class="log" id="log"><div class="faint">Sin jugadas todavía.</div></div>
+  </aside>
+</main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const PIPS = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+const color = n => `var(--p${((parseInt(String(n).slice(1)) || 1) - 1) % 6})`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('dm.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('dm.' + k, JSON.stringify(v)); } catch {} },
+};
+
+function die(face, cls = '') {
+  if (!face) return `<span class="die hid ${cls}">?</span>`;
+  let cells = '';
+  for (let i = 0; i < 9; i++) cells += `<i class="${PIPS[face].includes(i) ? 'on' : ''}"></i>`;
+  return `<span class="die ${cls}">${cells}</span>`;
+}
+const tiny = f => die(f, 'mini');
+const nm = n => `<b style="color:${color(n)}">${n}</b>`;
+
+/* ------------------------------------------------------------------ jugadores */
+const BOTS = [
+  {spec: 'probbot', label: 'probbot', note: 'estadístico'},
+  {spec: 'probbot:0.3', label: 'probbot 0.3', note: 'con faroles'},
+  {spec: 'random', label: 'random', note: 'al azar'},
+];
+let lineup = store.get('lineup', ['probbot', 'random']);
+let models = [], ollamaUp = true, menuOpen = false;
+
+function labelOf(spec) {
+  const m = spec.match(/^ollama:([^?@]+)/);
+  return m ? m[1] : spec.replace(/\?.*$/, '');
+}
+function drawLineup() {
+  $('chips').innerHTML = lineup.map((s, i) =>
+    `<span class="chip" style="--c:${color('J' + (i + 1))}" title="${esc(s)}"><b></b><span>${esc(labelOf(s))}</span><button data-i="${i}" aria-label="Quitar ${esc(labelOf(s))}">×</button></span>`).join('') +
+    (lineup.length < 6 ? `<button class="add" id="addbtn" aria-expanded="${menuOpen}">+ Añadir</button>` : '');
+  $('lineuphint').textContent = lineup.length < 2 ? 'Hacen falta al menos 2 jugadores.' : '';
+  store.set('lineup', lineup);
+  drawMenu();
+}
+function drawMenu() {
+  const m = $('menu');
+  m.hidden = !menuOpen;
+  if (!menuOpen) return;
+  const opt = (spec, label, note) => `<button class="opt" data-spec="${esc(spec)}"><span>${esc(label)}</span><em>${esc(note || '')}</em></button>`;
+  m.className = 'menu';
+  m.innerHTML = `<h3>Bots</h3>${BOTS.map(b => opt(b.spec, b.label, b.note)).join('')}
+    <h3>Modelos en Ollama</h3>` +
+    (models.length ? models.map(x => opt('ollama:' + x.name, x.name, x.gb ? x.gb + ' GB' + (x.gb > 8 ? ' · pesado' : '') : '')).join('')
+      : `<div class="note">${ollamaUp ? 'No hay modelos instalados.' : 'Ollama no está abierto: se arrancará solo al jugar con un modelo.'}</div>`) +
+    `<h3>Personalizado</h3><form id="custom"><input type="text" id="customin" placeholder="ollama:modelo?think=false" spellcheck="false"><button class="mini">Añadir</button></form>`;
+}
+function addPlayer(spec) {
+  spec = spec.trim();
+  if (!spec || lineup.length >= 6) return;
+  lineup.push(spec); drawLineup();
+}
+$('chips').addEventListener('click', e => {
+  const x = e.target.closest('button[data-i]');
+  if (x) { lineup.splice(+x.dataset.i, 1); drawLineup(); return; }
+  if (e.target.closest('#addbtn')) { menuOpen = !menuOpen; drawLineup(); }
+});
+$('menu').addEventListener('click', e => {
+  const o = e.target.closest('.opt'); if (o) addPlayer(o.dataset.spec);
+});
+$('menu').addEventListener('submit', e => {
+  e.preventDefault(); const i = $('customin'); addPlayer(i.value); i.value = '';
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && menuOpen) { menuOpen = false; drawLineup(); } });
+document.addEventListener('click', e => {
+  if (menuOpen && !e.target.closest('#menu') && !e.target.closest('#addbtn') && !e.target.closest('.chip')) { menuOpen = false; drawLineup(); }
+});
+
+/* ------------------------------------------------------------------ ajustes */
+const STEPS = [['games', 'Partidas', 1, 500, store.get('games', 5)], ['dice', 'Dados', 1, 10, store.get('dice', 5)], ['seed', 'Semilla', 0, 9999, store.get('seed', 1)]];
+const vals = Object.fromEntries(STEPS.map(s => [s[0], s[4]]));
+function drawSteppers() {
+  $('steppers').innerHTML = STEPS.map(([k, l]) =>
+    `<div class="step"><label>${l}</label><div><button data-k="${k}" data-d="-1" aria-label="Menos ${l}">−</button><output>${vals[k]}</output><button data-k="${k}" data-d="1" aria-label="Más ${l}">+</button></div></div>`).join('');
+}
+$('steppers').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const [k, , lo, hi] = STEPS.find(s => s[0] === b.dataset.k);
+  const step = k === 'games' && vals[k] >= 10 ? 5 : 1;
+  vals[k] = Math.max(lo, Math.min(hi, vals[k] + (+b.dataset.d) * step));
+  store.set(k, vals[k]); drawSteppers();
+});
+$('rotate').checked = store.get('rotate', true); $('fast').checked = store.get('fast', true);
+$('rotate').onchange = () => store.set('rotate', $('rotate').checked);
+$('fast').onchange = () => store.set('fast', $('fast').checked);
+
+// en modo rápido los modelos de Ollama usan: sin razonamiento, contexto acotado (evita que Ollama los expulse de la memoria) y keep_alive
+function finalSpec(spec) {
+  if (!spec.startsWith('ollama:') || !$('fast').checked) return spec;
+  const [base, q = ''] = spec.split('?');
+  const have = new Set(q.split(/[+&]/).filter(Boolean).map(x => x.split('=')[0]));
+  const extra = [['think', 'false'], ['num_ctx', '2048'], ['keep_alive', '30m']].filter(([k]) => !have.has(k)).map(([k, v]) => `${k}=${v}`);
+  return extra.length || q ? base + '?' + [q, ...extra].filter(Boolean).join('+') : base;
+}
+
+/* ------------------------------------------------------------------ reproducción */
+let since = 0, queue = [], busy = false, paused = false, serverRunning = false, serverError = null, timer = null, running = false;
+let S, score = {}, gamesDone = 0, speed = store.get('speed', 2);
+function resetTable() {
+  S = {players: [], counts: {}, hands: {}, reveal: false, active: null, bid: null, bidder: null, hit: null,
+       verdict: '', verdictOk: false, dudo: false, winner: null, round: 0, g: 0, total: 0, roll: false};
+}
+resetTable();
+
+function render() {
+  const showHands = $('eye').classList.contains('on');
+  $('seats').innerHTML = S.players.map(p => {
+    const left = S.counts[p.name] ?? 0, hand = S.hands[p.name] || [], visible = showHands || S.reveal;
+    const dice = left > 0 ? hand.map(f => visible
+      ? die(f, [S.roll ? 'roll' : '', S.reveal && S.hit != null ? (f === S.hit ? 'hit' : 'dim') : ''].join(' ')) : die(0, S.roll ? 'roll' : '')).join('') : '';
+    const cls = ['seat', S.active === p.name ? 'active' : '', left <= 0 ? 'out' : '', S.winner === p.name ? 'winner' : ''].join(' ');
+    const total = S.total || left;
+    return `<div class="${cls}" style="--c:${color(p.name)}">
+      <div class="top"><span class="av">${p.name}</span><div class="nm"><b>${esc(labelOf(p.spec))}</b><span title="${esc(p.spec)}">${esc(p.spec.includes('?') ? p.spec.split('?')[1].replace(/\+/g, ' · ') : p.name)}</span></div></div>
+      <div class="hand">${dice}</div>
+      <div class="life">${Array.from({length: total}, (_, i) => `<i class="${i < left ? '' : 'lost'}"></i>`).join('')}</div>
+    </div>`;
+  }).join('');
+  let c;
+  if (S.winner) {
+    const sp = S.players.find(p => p.name === S.winner)?.spec || '';
+    c = `<div class="who">Partida ${S.g} terminada</div><div class="bidline" style="color:var(--warn)">♛ ${esc(labelOf(sp))}</div><div class="who">${S.winner}</div>`;
+  } else if (S.dudo) {
+    c = `<div class="dudo">¡Dudo!</div>${S.bid ? `<div class="bidline">${S.bid.quantity}<span class="x">×</span>${die(S.bid.face, 'big')}</div>` : ''}
+         <div class="verdict ${S.verdictOk ? 'ok' : 'ko'}">${S.verdict}</div>`;
+  } else if (S.bid) {
+    c = `<div class="who">${nm(S.bidder)} apuesta</div><div class="bidline pop">${S.bid.quantity}<span class="x">×</span>${die(S.bid.face, 'big')}</div>
+         <div class="who">Turno de ${S.active ? nm(S.active) : '—'}</div>`;
+  } else if (S.round) {
+    c = `<div class="who">Ronda ${S.round}</div><div class="bidline" style="font-size:26px;color:var(--muted)">Empieza ${S.active}</div>`;
+  } else {
+    c = `<div class="empty"><div class="row3">${die(3, 'big')}${die(5, 'big')}${die(1, 'big')}</div><div>Elige jugadores y pulsa <b style="color:var(--text)">Jugar</b></div></div>`;
+  }
+  $('center').innerHTML = c;
+}
+function logLine(html, cls = '') {
+  const log = $('log');
+  if (log.querySelector('.faint')) log.innerHTML = '';
+  const d = document.createElement('div'); d.className = 'ln ' + cls; d.innerHTML = html;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+function logHead(t) {
+  const log = $('log'); if (log.querySelector('.faint')) log.innerHTML = '';
+  const d = document.createElement('div'); d.className = 'rd'; d.textContent = t; log.appendChild(d);
+}
+function renderScore() {
+  const rows = Object.entries(score).sort((a, b) => (b[1].wins / b[1].games) - (a[1].wins / a[1].games));
+  $('score').innerHTML = rows.map(([spec, v]) => {
+    const pct = v.games ? v.wins / v.games : 0;
+    return `<div class="s"><div><span title="${esc(spec)}">${esc(labelOf(spec))}</span><b>${v.wins}/${v.games}</b></div><i><u style="width:${pct * 100}%"></u></i></div>`;
+  }).join('');
+}
+
+function apply(ev) {
+  switch (ev.type) {
+    case 'notice': $('stat').textContent = ev.text; return 250;
+    case 'game_start':
+      resetTable(); S.players = ev.players; S.total = ev.dice_per_player; S.g = ev._g;
+      S.counts = Object.fromEntries(ev.players.map(p => [p.name, ev.dice_per_player]));
+      logHead(`Partida ${ev._g} de ${ev._total}`);
+      logLine(ev.players.map(p => `${nm(p.name)} ${esc(labelOf(p.spec))}`).join(' · '));
+      $('stat').textContent = `Partida ${ev._g} de ${ev._total}`;
+      $('prog').style.width = ((ev._g - 1) / ev._total * 100) + '%';
+      return 500;
+    case 'round_start':
+      S.round = ev.round; S.counts = ev.dice_counts; S.hands = ev.hands; S.reveal = false; S.hit = null; S.roll = true;
+      S.bid = null; S.bidder = null; S.dudo = false; S.verdict = ''; S.active = ev.starter;
+      logHead(`Ronda ${ev.round} · empieza ${ev.starter}`);
+      return 900;
+    case 'turn': {
+      S.active = ev.player; S.dudo = false;
+      const bad = (ev.attempts || []).filter(a => a.error).length;
+      if (ev.action.action === 'bid') {
+        S.bid = {quantity: ev.action.quantity, face: ev.action.face}; S.bidder = ev.player;
+        const p = ev.p_bid_true != null ? ` <span style="color:var(--faint)">${Math.round(ev.p_bid_true * 100)}%</span>` : '';
+        logLine(`${nm(ev.player)} apuesta <span class="em">${ev.action.quantity} × ${tiny(ev.action.face)}</span>${p}${ev.forced ? ' <span class="fx">· forzada</span>' : ''}`);
+      } else {
+        S.dudo = true; S.verdict = '';
+        logLine(`${nm(ev.player)} <b style="color:var(--bad)">duda</b>`);
+      }
+      if (bad) logLine(`<span class="fx">↳ ${bad} respuesta(s) inválida(s)</span>`);
+      return 1000;
+    }
+    case 'challenge':
+      S.reveal = true; S.hit = ev.challenged_bid.face; S.hands = ev.revealed_hands; S.bid = ev.challenged_bid; S.dudo = true; S.verdictOk = ev.bid_was_true;
+      S.verdict = `Había ${ev.real_count} · apuesta ${ev.bid_was_true ? 'cierta' : 'falsa'} · pierde un dado ${ev.loser}`;
+      logLine(`Destapan: <span class="em">${ev.real_count} × ${tiny(ev.challenged_bid.face)}</span> — ${ev.bid_was_true ? '✔ cierta' : '✘ falsa'}, pierde ${nm(ev.loser)}`);
+      return 2400;
+    case 'eliminated': logLine(`<span class="fx">✕ ${ev.player} eliminado</span>`); return 600;
+    case 'game_end': {
+      S.winner = ev.winner; S.active = null; gamesDone = ev._g;
+      const specOf = Object.fromEntries(S.players.map(p => [p.name, p.spec]));
+      for (const spec of new Set(Object.values(specOf))) { score[spec] = score[spec] || {games: 0, wins: 0}; score[spec].games++; }
+      if (ev.winner) score[specOf[ev.winner]].wins++;
+      renderScore();
+      logLine(`♛ Gana ${nm(ev.winner)} en ${ev.rounds} rondas`, 'em');
+      $('prog').style.width = (ev._g / ev._total * 100) + '%';
+      return 1700;
+    }
+  }
+  return 0;
+}
+
+async function pump() {
+  if (busy) return; busy = true;
+  while (queue.length && !paused) {
+    const ev = queue.shift(), wait = apply(ev); render(); S.roll = false;
+    if (wait && speed < 99) await new Promise(r => setTimeout(r, wait / speed));
+  }
+  busy = false; settle();
+}
+function setRunning(on) {
+  running = on;
+  $('go').classList.toggle('stop', on);
+  $('goicon').textContent = on ? '■' : '▶'; $('gotxt').textContent = on ? 'Parar' : 'Jugar';
+  $('pill').classList.toggle('live', on); $('pilltxt').textContent = on ? 'Jugando' : 'Listo';
+}
+function settle() {
+  if (running && !serverRunning && !queue.length && !busy) {
+    setRunning(false);
+    if (serverError) { $('err').textContent = serverError; $('stat').textContent = 'Interrumpido.'; }
+    else if (gamesDone) $('stat').textContent = `Terminado: ${gamesDone} partida${gamesDone > 1 ? 's' : ''}. Registros guardados.`;
+  }
+}
+async function poll() {
+  try {
+    const r = await (await fetch(`/api/events?since=${since}`)).json();
+    since = r.next; serverRunning = r.running; serverError = r.error;
+    if (r.events.length) { queue.push(...r.events); pump(); } else settle();
+  } catch (e) {}
+  if (running) timer = setTimeout(poll, 350);
+}
+
+async function start() {
+  $('err').textContent = '';
+  if (lineup.length < 2) { $('err').textContent = 'Añade al menos 2 jugadores.'; return; }
+  menuOpen = false; drawLineup();
+  const body = {players: lineup.map(finalSpec), games: vals.games, dice: vals.dice, seed: vals.seed,
+                retries: +$('retries').value, penalty: $('penalty').value, rotate: $('rotate').checked};
+  let r, j;
+  try { r = await fetch('/api/start', {method: 'POST', body: JSON.stringify(body)}); j = await r.json(); }
+  catch { $('err').textContent = 'No se pudo contactar con la aplicación.'; return; }
+  if (!r.ok) { $('err').textContent = j.error; return; }
+  since = 0; queue = []; score = {}; gamesDone = 0; paused = false; serverError = null; serverRunning = true;
+  $('pause').textContent = '❚❚'; resetTable(); render(); renderScore();
+  $('log').innerHTML = '<div class="faint">Sin jugadas todavía.</div>'; $('prog').style.width = '0';
+  $('stat').textContent = 'Preparando…'; setRunning(true); clearTimeout(timer); poll();
+}
+async function stop() {
+  queue = []; paused = false; $('pause').textContent = '❚❚';
+  try { await fetch('/api/stop', {method: 'POST', body: '{}'}); } catch {}
+  serverRunning = false; setRunning(false);
+  $('stat').textContent = 'Detenido.'; S.active = null; S.dudo = false; render();
+}
+$('go').onclick = () => running ? stop() : start();
+$('pause').onclick = () => { paused = !paused; $('pause').textContent = paused ? '▶' : '❚❚'; if (!paused) pump(); };
+$('eye').onclick = () => { $('eye').classList.toggle('on'); store.set('eye', $('eye').classList.contains('on')); render(); };
+$('speed').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  speed = +b.dataset.v; store.set('speed', speed);
+  [...$('speed').children].forEach(x => x.classList.toggle('on', x === b));
+};
+[...$('speed').children].forEach(x => x.classList.toggle('on', +x.dataset.v === speed));
+if (store.get('eye', true) === false) $('eye').classList.remove('on');
+$('openlogs').onclick = async () => {
+  try { const j = await (await fetch('/api/open_logs', {method: 'POST', body: '{}'})).json(); if (!j.ok) $('err').textContent = 'Registros en: ' + j.path; } catch {}
+};
+setInterval(() => fetch('/api/ping').catch(() => {}), 5000);  // señal de vida: la app se cierra sola al cerrar la pestaña
+addEventListener('pagehide', () => navigator.sendBeacon('/api/bye', new Blob(['{}'], {type: 'application/json'})));
+
+fetch('/api/models').then(r => r.json()).then(j => { ollamaUp = j.ollama; models = j.models || []; drawMenu(); }).catch(() => {});
+drawSteppers(); drawLineup(); render();
+// atajos solo para capturas de pantalla
+if (location.hash === '#demo') setTimeout(() => $('go').click(), 300);
+if (location.hash === '#menu') { menuOpen = true; drawLineup(); }
+</script>
+</body>
+</html>

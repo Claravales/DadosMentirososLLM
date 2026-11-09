@@ -57,6 +57,8 @@ OPTION_PARSERS: dict[str, Callable[[str], Any]] = {
     "temperature": _non_negative_float,
     "json_mode": _parse_bool,
     "num_predict": _positive(int, "num_predict"),
+    "num_ctx": _positive(int, "num_ctx"),     # ventana de contexto: más pequeña = menos memoria (evita que Ollama expulse el modelo)
+    "keep_alive": str,                         # cuánto tiempo mantener el modelo en memoria, p. ej. 30m
     "timeout": _positive(float, "timeout"),
     "think": _parse_bool,
     "host": str,
@@ -98,6 +100,8 @@ class OllamaPlayer(Player):
         spec: str = "",
         retry_wait: float = 2.0,
         warmup_timeout: float = 600.0,
+        num_ctx: Optional[int] = None,
+        keep_alive: Optional[str] = None,
     ):
         super().__init__(name, spec or f"ollama:{model}")
         self.model, self.style, self.host = model, style, host.rstrip("/")
@@ -105,6 +109,11 @@ class OllamaPlayer(Player):
         self.json_mode, self.num_predict, self.seed = json_mode, num_predict, seed
         self.think = think
         self.retry_wait, self.warmup_timeout = retry_wait, warmup_timeout
+        self.num_ctx, self.keep_alive = num_ctx, keep_alive
+
+    def _connect_host(self) -> str:
+        """Host real de conexión: 'localhost' -> 127.0.0.1 (en Windows 'localhost' prueba IPv6 primero y añade ~2 s por petición)."""
+        return self.host.replace("//localhost", "//127.0.0.1", 1)
 
     def describe(self) -> dict:
         return {
@@ -112,12 +121,15 @@ class OllamaPlayer(Player):
             "temperature": self.temperature, "think": self.think, "json_mode": self.json_mode,
             "num_predict": self.num_predict, "timeout": self.timeout, "host": self.host,
             "seed": self.seed, "retry_wait": self.retry_wait, "warmup_timeout": self.warmup_timeout,
+            "num_ctx": self.num_ctx, "keep_alive": self.keep_alive,
         }
 
     def act(self, obs: Observation, feedback: Optional[str] = None) -> PlayerReply:
         options: dict = {"temperature": self.temperature}
         if self.num_predict:
             options["num_predict"] = self.num_predict
+        if self.num_ctx:
+            options["num_ctx"] = self.num_ctx
         if self.seed is not None:
             options["seed"] = self.seed
         payload: dict = {
@@ -128,6 +140,8 @@ class OllamaPlayer(Player):
         }
         if self.think is not None:
             payload["think"] = self.think
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
         if self.json_mode:  # ojo: restringe la salida; no combina bien con razonamiento libre
             payload["format"] = "json"
         data, infra_events = self._post(payload, self.timeout)
@@ -154,7 +168,7 @@ class OllamaPlayer(Player):
     # ------------------------------------------------------------ transporte
     def _send(self, payload: dict, timeout: float) -> dict:
         req = urllib.request.Request(
-            f"{self.host}/api/chat",
+            f"{self._connect_host()}/api/chat",
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"},
         )
@@ -208,10 +222,12 @@ class OllamaPlayer(Player):
         payload: dict = {
             "model": self.model, "stream": False,
             "messages": [{"role": "user", "content": "Responde únicamente: ok"}],
-            "options": {"temperature": 0, "num_predict": 1},
+            "options": {"temperature": 0, "num_predict": 1, **({"num_ctx": self.num_ctx} if self.num_ctx else {})},
         }
         if self.think is not None:
             payload["think"] = self.think
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
         t0 = time.perf_counter()
         try:
             data, events = self._post(payload, max(self.timeout, self.warmup_timeout))

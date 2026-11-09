@@ -280,7 +280,7 @@ def test_ollama_describe_lists_every_option_including_think():
     d = p.describe()
     assert d == {"class": "OllamaPlayer", "model": "m", "style": "basic", "temperature": 0.7, "think": False,
                  "json_mode": False, "num_predict": 64, "timeout": 120.0, "host": "http://localhost:11434",
-                 "seed": 3, "retry_wait": 2.0, "warmup_timeout": 600.0}
+                 "seed": 3, "retry_wait": 2.0, "warmup_timeout": 600.0, "num_ctx": None, "keep_alive": None}
     json.dumps(d)  # serializable
 
 

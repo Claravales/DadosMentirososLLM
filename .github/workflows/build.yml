@@ -1,0 +1,49 @@
+name: Construir aplicación
+
+# Se ejecuta a mano (Actions > Construir aplicación > Run workflow) o al crear una etiqueta v*, p. ej. v1.0.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            sep: ";"
+          - os: macos-latest
+            name: macOS
+            sep: ":"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyinstaller pytest
+      - run: python -m pytest -q
+      - name: Empaquetar
+        run: >
+          pyinstaller --noconfirm --clean --onefile --noconsole --name "Dados Mentirosos"
+          --add-data "liars_dice/web/index.html${{ matrix.sep }}liars_dice/web" web_app.py
+      - name: Comprimir (conserva permisos en macOS)
+        shell: bash
+        run: |
+          cd dist
+          if [ "${{ matrix.name }}" = "macOS" ]; then
+            zip -r "../Dados-Mentirosos-macOS.zip" .
+          else
+            7z a "../Dados-Mentirosos-Windows.zip" .
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dados-Mentirosos-${{ matrix.name }}
+          path: Dados-Mentirosos-${{ matrix.name }}.zip
+      - name: Publicar en Releases (solo con etiqueta)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Dados-Mentirosos-${{ matrix.name }}.zip

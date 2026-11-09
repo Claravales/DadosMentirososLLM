@@ -18,3 +18,9 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Aplicación empaquetada
+dist/
+build/
+*.spec
+error.log
