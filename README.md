@@ -15,6 +15,17 @@ El «Modo rápido para modelos» (activo por defecto) añade `think=false`, `num
 `Abrir Dados Mentirosos.bat` evita el problema usando Python (que sí está firmado) y solo recurre al `.exe` si no hay Python.
 Para repartir el `.exe` a otras personas sin avisos hace falta firmarlo con un certificado de firma de código.
 
+## Interfaz web con Streamlit (alternativa, requiere instalar dependencias)
+
+Instala las dependencias de la interfaz y arráncala desde la raíz del proyecto:
+
+```bash
+pip install -r requirements-ui.txt
+streamlit run streamlit_app.py
+```
+
+La aplicación permite configurar y ejecutar lotes de partidas, y consultar las ejecuciones guardadas en `logs/`: victorias, duración, estados, actividad y eventos de cada partida. Para jugadores Ollama, el servidor local debe estar en marcha y el modelo disponible.
+
 ## Uso rápido (línea de comandos)
 
 ```bash
