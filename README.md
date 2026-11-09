@@ -3,6 +3,17 @@
 Árbitro de Liar's Dice (Perudo) en el que todos los jugadores son modelos de lenguaje locales (pesos abiertos, vía Ollama).
 Sólo usa la librería estándar de Python (3.10+). Para los tests: `pip install -r requirements-dev.txt`.
 
+## Interfaz web local
+
+Instala las dependencias de la interfaz y arráncala desde la raíz del proyecto:
+
+```bash
+pip install -r requirements-ui.txt
+streamlit run streamlit_app.py
+```
+
+La aplicación permite configurar y ejecutar lotes de partidas, y consultar las ejecuciones guardadas en `logs/`: victorias, duración, estados, actividad y eventos de cada partida. Para jugadores Ollama, el servidor local debe estar en marcha y el modelo disponible.
+
 ## Uso rápido
 
 ```bash
