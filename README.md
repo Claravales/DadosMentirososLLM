@@ -1,13 +1,17 @@
 # DadosMentirososLLM
 
 Árbitro de Liar's Dice (Perudo) en el que todos los jugadores son modelos de lenguaje locales (pesos abiertos, vía Ollama).
-Sólo usa la librería estándar de Python (3.10+). Para los tests: `pip install -r requirements-dev.txt`.
+El árbitro y la línea de comandos sólo usan la librería estándar de Python (3.10+); la interfaz Streamlit (opcional) necesita `streamlit` y `pandas`.
+Para los tests: `pip install -r requirements-dev.txt`.
 
 ## Aplicación con interfaz gráfica (sin terminal)
 
 Doble clic en **`Dados Mentirosos.pyw`** (necesita Python instalado) o en **`dist/Dados Mentirosos.exe`** (no necesita nada):
 se abre la interfaz en el navegador, se configura la partida y se ve jugar en una mesa animada. Se cierra sola al cerrar la
 pestaña, y guarda los registros en `logs/<fecha>/` (mismo formato que `run_games.py`). `build_exe.bat` regenera el `.exe`.
+El `.exe` **no se guarda en el repositorio** (`dist/` se genera al construirlo): créalo en local con `build_exe.bat`, o descárgalo como artefacto del workflow
+de GitHub Actions *Construir aplicación* (`.github/workflows/build.yml`; se lanza a mano desde la pestaña Actions o al crear una etiqueta `v*`),
+que ejecuta antes los tests y publica un zip para Windows y otro para macOS.
 Código: `web_app.py` (servidor local), `liars_dice/web/index.html` (interfaz) y `liars_dice/runner.py` (ejecución y registros, compartido con `run_games.py`).
 El «Modo rápido para modelos» (activo por defecto) añade `think=false`, `num_ctx=2048` y `keep_alive=30m` a los modelos de Ollama.
 
@@ -69,6 +73,21 @@ Ejemplo: `"ollama:gemma4:e2b@basic?think=false+temperature=0.2+num_predict=300"`
 El **spec completo** es la identidad del jugador: dos specs distintos se cuentan como jugadores distintos en `games.csv` y en el resumen.
 Un spec o una opción mal escritos hacen fallar `run_games.py` al arrancar, antes de jugar nada.
 
+### Estilos de prompt (`@estilo`)
+
+El estilo se elige con `@` tras el modelo (`ollama:<modelo>@<estilo>`) y añade instrucciones extra al prompt del sistema. Se definen en `STYLES`, dentro de `liars_dice/prompts.py`:
+
+| Estilo | Qué pide al modelo |
+|---|---|
+| `basic` | Nada extra (grupo de control; es el que se usa si no se indica estilo) |
+| `cot` | Razonar brevemente paso a paso y acabar con el JSON en la última línea |
+| `agresivo` | Farolear con frecuencia y dudar poco |
+| `conservador` | Apostar sólo con seguridad y dudar ante apuestas exageradas |
+| `probabilista` | Comparar la apuesta con el número esperado de dados (N/6) |
+
+Avisos: un estilo mal escrito **no da error** y se ejecuta como `basic`, así que revisad los nombres antes de lanzar partidas. `cot` necesita un `num_predict` holgado (≥ 400) y no combina con `json_mode=true`.
+Para comparar estilos de forma justa, cambiad **sólo el estilo** entre jugadores y usad `--rotate`. Más detalles en [README_M2.md](README_M2.md).
+
 ## Reglas implementadas (decisiones del árbitro)
 
 - 5 dados por jugador (`--dice`), caras 1–6, **sin comodines** (los 1 no valen por otra cara).
@@ -115,7 +134,10 @@ y las últimas rondas ya destapadas (copias profundas: modificarlas no afecta al
 | `liars_dice/players/ollama_player.py` | **M2** | Opción nueva = parámetro en `__init__` + `describe()` + entrada en `OPTION_PARSERS` |
 | Jugadores nuevos (`players/<nombre>.py`) | **M2** | Registrarlos en `make_player` es cambio de M1 (una línea) |
 | `analysis/` | **M3** | Ver [analysis/README.md](analysis/README.md) |
-| `tests/test_all.py`, `test_robustness.py`, `test_contract.py` | **M1** | M2 y M3: tests nuevos en archivos propios (`tests/test_prompts.py`, `tests/test_analysis.py`...) |
+| `liars_dice/runner.py`, `liars_dice/ui.py` (ejecución, registros y salida de consola compartidas) | **M1** | Los usan `run_games.py`, la app de escritorio y Streamlit |
+| `web_app.py`, `liars_dice/web/index.html`, `Dados Mentirosos.pyw`, `Abrir Dados Mentirosos.bat`, `build_exe.bat`, `.github/workflows/build.yml` | Sin asignar | Aplicación de escritorio y su empaquetado |
+| `streamlit_app.py`, `requirements-ui.txt` | Sin asignar | Interfaz Streamlit (opcional) |
+| `tests/test_all.py`, `test_robustness.py`, `test_contract.py`, `test_infrastructure.py`, `test_runner.py`, `test_web_app.py` | **M1** | M2 y M3: tests nuevos en archivos propios (`tests/test_prompts.py`, `tests/test_analysis.py`...) |
 | `examples/` | **M1** | Se regenera cuando sube `SCHEMA_VERSION` |
 
 Regla: si vuestro cambio obliga a editar un archivo de otro, no lo editéis; abrid un aviso al dueño. Los tests deben pasar antes de
@@ -177,10 +199,20 @@ liars_dice/parser.py       texto del modelo -> Action
 liars_dice/observation.py  lo que ve un jugador
 liars_dice/game.py         Referee: rondas, reintentos, penalización, eventos, SCHEMA_VERSION
 liars_dice/players/        base (Player, PlayerReply), baselines (random, probbot), ollama_player, make_player
-liars_dice/prompts.py      prompts (M2)
-run_games.py               N partidas + logs
+liars_dice/prompts.py      prompts y estilos (M2)
+liars_dice/runner.py       ejecución de series de partidas, calentamiento y registros (compartido por run_games.py y las apps)
+liars_dice/ui.py           salida de consola: colores, dados Unicode y resumen final
+liars_dice/web/index.html  interfaz de la app de escritorio (mesa animada)
+run_games.py               N partidas + logs (línea de comandos)
+web_app.py                 servidor local de la app de escritorio
+Dados Mentirosos.pyw       lanzador con doble clic (necesita Python)
+Abrir Dados Mentirosos.bat lanzador para Windows (usa Python y, si no hay, el .exe)
+build_exe.bat              genera el .exe con PyInstaller
+streamlit_app.py           interfaz Streamlit (opcional, requirements-ui.txt)
+.github/workflows/         build.yml: tests + empaquetado para Windows y macOS
 examples/sample_run/       log de ejemplo (random y probbot)
 analysis/                  análisis (M3)
 tests/                     pytest
+README_M2.md               notas de M2 sobre los estilos de prompt
 TODO.md                    pendientes conocidos
 ```
